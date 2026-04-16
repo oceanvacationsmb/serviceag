@@ -204,6 +204,7 @@ function drawText(page, text, x, y, options = {}) {
 function drawFitText(page, text, x, y, maxWidth, options = {}) {
   const { font, size = 10 } = options;
   if (!text) return;
+
   let current = String(text);
   let fontSize = size;
 
@@ -218,51 +219,79 @@ async function drawW9(pdfDoc, page, data, font) {
   const w9 = data.w9 || {};
   const requester = data.requester_name_address || window.OV_CONFIG.requesterNameAddress;
 
-  drawFitText(page, w9.name, 152, 604, 325, { font, size: 13 });
-  drawFitText(page, w9.business_name, 152, 580, 325, { font, size: 12 });
+  // line 1
+  drawFitText(page, w9.name, 92, 609, 300, { font, size: 11 });
 
+  // line 2
+  drawFitText(page, w9.business_name, 92, 582, 300, { font, size: 10.5 });
+
+  // classification
   const checks = {
-    individual: [190, 547],
-    c_corp: [274, 547],
-    s_corp: [335, 547],
-    partnership: [392, 547],
-    trust_estate: [455, 547],
-    llc_c: [193, 530],
-    llc_s: [193, 530],
-    llc_p: [193, 530],
-    other: [193, 494]
+    individual: [95, 548],
+    c_corp: [166, 548],
+    s_corp: [222, 548],
+    partnership: [281, 548],
+    trust_estate: [344, 548],
+    llc_c: [95, 531],
+    llc_s: [95, 531],
+    llc_p: [95, 531],
+    other: [95, 497]
   };
 
   const box = checks[w9.classification];
-  if (box) drawText(page, 'X', box[0], box[1], { font, size: 12 });
-
-  if (w9.classification?.startsWith('llc_')) {
-    const taxLetter = w9.classification === 'llc_c' ? 'C' : w9.classification === 'llc_s' ? 'S' : 'P';
-    drawText(page, taxLetter, 365, 530, { font, size: 11 });
+  if (box) {
+    drawText(page, 'X', box[0], box[1], { font, size: 11 });
   }
 
-  drawFitText(page, w9.exemptions, 488, 532, 90, { font, size: 9 });
-  drawFitText(page, w9.address, 152, 474, 320, { font, size: 12 });
-  drawFitText(page, requester, 492, 474, 94, { font, size: 8.8 });
-  drawFitText(page, `${w9.city}, ${w9.state} ${w9.zip}`, 152, 449, 320, { font, size: 12 });
+  // LLC tax letter
+  if (w9.classification?.startsWith('llc_')) {
+    const taxLetter =
+      w9.classification === 'llc_c' ? 'C' :
+      w9.classification === 'llc_s' ? 'S' : 'P';
+    drawText(page, taxLetter, 252, 531, { font, size: 10 });
+  }
 
+  // exemptions
+  drawFitText(page, w9.exemptions, 455, 532, 90, { font, size: 8.5 });
+
+  // line 5
+  drawFitText(page, w9.address, 92, 478, 285, { font, size: 10.5 });
+
+  // requester
+  drawFitText(page, requester, 430, 478, 120, { font, size: 7.8 });
+
+  // line 6
+  drawFitText(page, `${w9.city}, ${w9.state} ${w9.zip}`, 92, 451, 285, { font, size: 10.5 });
+
+  // TIN
   const raw = String(w9.tax_id || '').replace(/\D/g, '');
   const taxType = w9.tax_id_type || '';
 
   if (taxType === 'SSN') {
-    const ssnBoxes = [453, 473, 493, 527, 547, 581, 601, 621, 641];
-    raw.slice(0, 9).split('').forEach((ch, i) => drawText(page, ch, ssnBoxes[i], 392, { font, size: 18 }));
+    const ssnBoxes = [406, 426, 446, 479, 499, 532, 552, 572, 592];
+    raw.slice(0, 9).split('').forEach((ch, i) => {
+      drawText(page, ch, ssnBoxes[i], 392, { font, size: 16 });
+    });
   } else if (taxType === 'EIN') {
-    const einBoxes = [451, 489, 509, 529, 549, 569, 589, 609, 629];
-    raw.slice(0, 9).split('').forEach((ch, i) => drawText(page, ch, einBoxes[i], 355, { font, size: 18 }));
+    const einBoxes = [406, 439, 459, 479, 499, 519, 539, 559, 579];
+    raw.slice(0, 9).split('').forEach((ch, i) => {
+      drawText(page, ch, einBoxes[i], 356, { font, size: 16 });
+    });
   }
 
+  // signature
   if (w9.signature_data_url && w9.signature_data_url.startsWith('data:image/png')) {
     const png = await pdfDoc.embedPng(w9.signature_data_url);
-    page.drawImage(png, { x: 165, y: 144, width: 160, height: 42 });
+    page.drawImage(png, {
+      x: 82,
+      y: 83,
+      width: 120,
+      height: 32
+    });
   }
 
-  drawText(page, normalizeDateForPdf(w9.signature_date), 460, 148, { font, size: 11 });
+  // signature date
+  drawText(page, normalizeDateForPdf(w9.signature_date), 456, 86, { font, size: 10.5 });
 }
 
 async function downloadPdf() {
@@ -291,21 +320,25 @@ async function downloadPdf() {
     const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
     const pages = pdfDoc.getPages();
 
+    // Page 1
     const page1 = pages[0];
     drawFitText(page1, p.property_address, 188, 686, 300, { font, size: 11.5 });
     drawFitText(page1, p.owner_name, 101, 655, 170, { font, size: 11.5 });
     drawFitText(page1, normalizeDateForPdf(p.effective_date), 214, 610, 175, { font, size: 11.5 });
     drawFitText(page1, a.pmc_percent, 438, 440, 45, { font, size: 11.5 });
 
+    // Page 4
     const page4 = pages[3];
     drawFitText(page4, a.owner_cleaning_fee, 425, 535, 120, { font, size: 11.5 });
     drawFitText(page4, serviceSummary(p.conditional_services), 345, 440, 220, { font, size: 9.5 });
+
     const sigParts = monthDayYearParts(p.effective_date);
     drawFitText(page4, sigParts.day, 420, 292, 28, { font, size: 11 });
     drawFitText(page4, sigParts.month, 468, 292, 65, { font, size: 11 });
     drawFitText(page4, sigParts.year, 545, 292, 36, { font, size: 11 });
     drawFitText(page4, p.owner_name, 118, 268, 160, { font, size: 11.5 });
 
+    // Page 5
     const page5 = pages[4];
     drawFitText(page5, p.owner_name, 103, 700, 210, { font, size: 12 });
     drawFitText(page5, p.bank_name, 160, 645, 210, { font, size: 11.5 });
@@ -317,6 +350,7 @@ async function downloadPdf() {
     drawFitText(page5, p.owner_name, 134, 434, 180, { font, size: 11.5 });
     drawFitText(page5, normalizeDateForPdf(p.effective_date), 136, 411, 140, { font, size: 11.5 });
 
+    // Page 6 W9
     const page6 = pages[5];
     await drawW9(pdfDoc, page6, p, font);
 
@@ -333,7 +367,10 @@ async function downloadPdf() {
 
     await adminClient
       .from('agreements')
-      .update({ admin_payload: a, status: 'ready_for_signature' })
+      .update({
+        admin_payload: a,
+        status: 'ready_for_signature'
+      })
       .eq('id', selectedRecord.id);
 
     adminStatus.textContent = 'Downloaded.';
