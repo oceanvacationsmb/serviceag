@@ -1,1 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>OV Agreement Owner Form</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="owner.js" defer></script>
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <div>
+        <h1>Ocean Vacations Owner Agreement</h1>
+        <p>Complete this form and click Send. We will review it, complete the company-only fields, and prepare the final agreement for signature.</p>
+      </div>
+      <span class="badge">Owner page</span>
+    </header>
 
+    <div class="layout">
+      <main class="card">
+        <form id="ownerForm" class="form-grid">
+          <section class="section full">
+            <h2>Owner information</h2>
+          </section>
+
+          <label>
+            Owner full legal name
+            <input id="owner_name" name="owner_name" required />
+          </label>
+
+          <label>
+            Email
+            <input id="owner_email" name="owner_email" type="email" required />
+          </label>
+
+          <label>
+            Phone
+            <input id="owner_phone" name="owner_phone" />
+          </label>
+
+          <label class="full">
+            Property address
+            <input id="property_address" name="property_address" required />
+          </label>
+
+          <label>
+            City
+            <select id="property_city" name="property_city" required>
+              <option value="">Select city</option>
+              <option>Myrtle Beach</option>
+              <option>North Myrtle Beach</option>
+              <option>Surfside Beach</option>
+              <option>Garden City</option>
+              <option>Murrells Inlet</option>
+              <option>Conway</option>
+              <option>Little River</option>
+            </select>
+          </label>
+
+          <label>
+            State
+            <input id="property_state" name="property_state" value="SC" readonly />
+          </label>
+
+          <label>
+            ZIP
+            <select id="property_zip" name="property_zip" required>
+              <option value="">Select ZIP</option>
+              <option>29575</option>
+              <option>29576</option>
+              <option>29577</option>
+              <option>29572</option>
+              <option>29582</option>
+              <option>29588</option>
+              <option>29579</option>
+            </select>
+          </label>
+
+          <label>
+            Effective date
+            <input id="effective_date" name="effective_date" type="date" required />
+          </label>
+
+          <section class="section full">
+            <h2>ACH / Direct debit authorization</h2>
+          </section>
+
+          <label>
+            Financial institution
+            <input id="bank_name" name="bank_name" />
+          </label>
+
+          <label>
+            Routing number
+            <input id="routing_number" name="routing_number" inputmode="numeric" />
+          </label>
+
+          <label>
+            Account number
+            <input id="account_number" name="account_number" inputmode="numeric" />
+          </label>
+
+          <label>
+            Amount or how amount is determined
+            <input id="ach_amount" name="ach_amount" value="1000-10000" />
+          </label>
+
+          <label>
+            Frequency
+            <input id="ach_frequency" name="ach_frequency" value="MONTHLY" readonly />
+          </label>
+
+          <label>
+            ACH starting date
+            <input id="ach_start_date" name="ach_start_date" type="date" />
+          </label>
+
+          <section class="section full">
+            <h2>Conditional services</h2>
+            <p class="muted">Choose only the services you want us to coordinate. Amounts are displayed for review only.</p>
+          </section>
+
+          <label class="check full">
+            <input type="checkbox" name="service_pool" />
+            <span>
+              <strong>Pool cleaning</strong>
+              <small>April to October: $250/month. November to April: $150/month.</small>
+            </span>
+          </label>
+
+          <label class="check full">
+            <input type="checkbox" name="service_pest" />
+            <span>
+              <strong>Pest control per unit</strong>
+              <small>$45 per month.</small>
+            </span>
+          </label>
+
+          <label class="check full">
+            <input type="checkbox" name="service_landscaping" />
+            <span>
+              <strong>Basic landscaping</strong>
+              <small>Depending on lawn size. April to October: $90 to $130/month. November to April: $45 to $65/month.</small>
+            </span>
+          </label>
+
+          <label class="full">
+            Additional notes for services
+            <textarea id="conditional_notes" name="conditional_notes" rows="3" placeholder="Optional"></textarea>
+          </label>
+
+          <section class="section full">
+            <h2>W-9 information</h2>
+          </section>
+
+          <label class="full">
+            Name as shown on tax return
+            <input id="w9_name" name="w9_name" required />
+          </label>
+
+          <label class="full">
+            Business name / disregarded entity name
+            <input id="w9_business_name" name="w9_business_name" />
+          </label>
+
+          <label class="full">
+            Federal tax classification
+            <select id="w9_classification" name="w9_classification" required>
+              <option value="">Select classification</option>
+              <option value="individual">Individual / sole proprietor</option>
+              <option value="c_corp">C corporation</option>
+              <option value="s_corp">S corporation</option>
+              <option value="partnership">Partnership</option>
+              <option value="trust_estate">Trust / estate</option>
+              <option value="llc_c">LLC taxed as C corporation</option>
+              <option value="llc_s">LLC taxed as S corporation</option>
+              <option value="llc_p">LLC taxed as Partnership</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+
+          <label class="full">
+            Exemptions / notes
+            <input id="w9_exemptions" name="w9_exemptions" />
+          </label>
+
+          <label class="full">
+            Address on W-9
+            <input id="w9_address" name="w9_address" required />
+          </label>
+
+          <label>
+            City
+            <input id="w9_city" name="w9_city" required />
+          </label>
+
+          <label>
+            State
+            <input id="w9_state" name="w9_state" value="SC" readonly />
+          </label>
+
+          <label>
+            ZIP
+            <input id="w9_zip" name="w9_zip" required />
+          </label>
+
+          <label>
+            Tax ID type
+            <select id="w9_tax_id_type" name="w9_tax_id_type" required>
+              <option value="">Select type</option>
+              <option value="SSN">SSN</option>
+              <option value="EIN">EIN</option>
+            </select>
+          </label>
+
+          <label id="taxIdLabel">
+            Tax ID
+            <input id="w9_tax_id" name="w9_tax_id" />
+          </label>
+
+          <div class="full">
+            <label>W-9 signature</label>
+            <div class="sig-wrap">
+              <canvas id="signaturePad"></canvas>
+            </div>
+            <div class="sig-actions">
+              <button type="button" class="secondary" id="clearSignature">Clear signature</button>
+            </div>
+          </div>
+
+          <label>
+            W-9 signature date
+            <input id="w9_signature_date" name="w9_signature_date" type="date" required />
+          </label>
+
+          <label class="check full">
+            <input type="checkbox" id="confirmReview" required />
+            <span>I reviewed the agreement and the information above is correct.</span>
+          </label>
+
+          <div class="actions full">
+            <button class="primary" id="sendBtn" type="submit">Send</button>
+            <span id="status" class="status"></span>
+          </div>
+        </form>
+      </main>
+
+      <aside class="card sticky">
+        <h2>Agreement</h2>
+        <details open>
+          <summary>Click to expand or collapse the agreement</summary>
+          <div class="viewer">
+            <iframe src="agreement-template.pdf#view=FitH" title="Agreement viewer"></iframe>
+          </div>
+        </details>
+
+        <div class="note">
+          <h3>Requester shown on W-9</h3>
+          <p>OCEAN VACATIONS INC.</p>
+        </div>
+      </aside>
+    </div>
+  </div>
+</body>
+</html>
