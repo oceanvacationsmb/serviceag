@@ -144,33 +144,36 @@ newAgreementForm.addEventListener('submit', async (e) => {
 
   const token = (window.crypto?.randomUUID?.() || `ov-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`);
   const clientEmail = document.getElementById('new_client_email').value.trim();
-  const ownerName = document.getElementById('new_owner_name').value.trim();
-  const ownerPhone = document.getElementById('new_owner_phone').value.trim();
-  const propertyAddress = document.getElementById('new_property_address').value.trim();
-  const propertyCity = document.getElementById('new_property_city').value.trim();
-  const propertyState = document.getElementById('new_property_state').value.trim() || 'SC';
-  const propertyZip = document.getElementById('new_property_zip').value.trim();
-  const effectiveDate = document.getElementById('new_effective_date').value;
   const pmcPercent = document.getElementById('new_pmc_percent').value;
   const ownerCleaningFee = document.getElementById('new_owner_cleaning_fee').value;
 
+  const servicePool = document.getElementById('new_service_pool').checked;
+  const servicePest = document.getElementById('new_service_pest').checked;
+  const serviceLandscaping = document.getElementById('new_service_landscaping').checked;
+  const servicesNotes = document.getElementById('new_services_notes').value.trim();
+
   const ownerPayload = {
     client_email: clientEmail,
-    owner_name: ownerName,
+    owner_name: '',
     owner_email: clientEmail,
-    owner_phone: ownerPhone,
-    property_address: propertyAddress,
-    property_city: propertyCity,
-    property_state: propertyState,
-    property_zip: propertyZip,
-    effective_date: effectiveDate,
+    owner_phone: '',
+    property_address: '',
+    property_city: '',
+    property_state: 'SC',
+    property_zip: '',
+    effective_date: '',
     bank_name: '',
     routing_number: '',
     account_number: '',
     ach_amount: 'Suggested amount is $5000-$10000',
     ach_frequency: 'MONTHLY',
-    ach_start_date: calculateAchStartDate(effectiveDate),
-    conditional_services: { pool: false, pest: false, landscaping: false, notes: '' },
+    ach_start_date: '',
+    conditional_services: {
+      pool: servicePool,
+      pest: servicePest,
+      landscaping: serviceLandscaping,
+      notes: servicesNotes
+    },
     owner_agreement_signature_data_url: '',
     w9: {
       name: '',
@@ -199,12 +202,12 @@ newAgreementForm.addEventListener('submit', async (e) => {
   const { error } = await adminClient.from('agreements').insert({
     agreement_token: token,
     client_email: clientEmail,
-    owner_name: ownerName,
+    owner_name: '',
     owner_email: clientEmail,
-    property_address: propertyAddress,
-    property_city: propertyCity,
-    property_state: propertyState,
-    property_zip: propertyZip,
+    property_address: '',
+    property_city: '',
+    property_state: 'SC',
+    property_zip: '',
     status: 'pending_client',
     owner_payload: ownerPayload,
     admin_payload: adminPayload
@@ -270,7 +273,7 @@ async function loadRecords() {
     btn.type = 'button';
     btn.className = 'record-item';
     btn.innerHTML = `
-      <strong>${escapeHtml(row.owner_name || 'Unnamed owner')}</strong>
+      <strong>${escapeHtml(row.owner_name || 'Waiting for owner')}</strong>
       <small>${escapeHtml(row.client_email || '')}</small>
       <small>${escapeHtml(row.property_address || '')}</small>
       <small>Status: ${escapeHtml(row.status || '')}</small>
