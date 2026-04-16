@@ -1,1 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>OV Agreement Admin</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+  <script src="config.js"></script>
+  <script src="admin.js" defer></script>
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <div>
+        <h1>Ocean Vacations Admin Agreements</h1>
+        <p>Review owner submissions, add PMC and owner-use cleaning fee, then download the final PDF for DocuSign.</p>
+      </div>
+      <span class="badge admin">Admin page</span>
+    </header>
 
+    <div class="card login-card" id="loginCard">
+      <div class="split">
+        <div>
+          <h2>Admin sign in</h2>
+          <p class="muted">Use your Supabase Auth email and password.</p>
+        </div>
+        <form id="loginForm" class="inline-form">
+          <input type="email" id="loginEmail" placeholder="Email" required />
+          <input type="password" id="loginPassword" placeholder="Password" required />
+          <button class="primary" type="submit">Sign in</button>
+        </form>
+      </div>
+      <div id="loginStatus" class="status"></div>
+    </div>
+
+    <div id="adminApp" class="layout hidden">
+      <aside class="card sidebar">
+        <div class="split">
+          <h2>Saved agreements</h2>
+          <button class="secondary" id="refreshBtn" type="button">Refresh</button>
+        </div>
+        <div id="recordsList" class="records"></div>
+      </aside>
+
+      <main class="card">
+        <div class="split">
+          <div>
+            <h2>Review and complete</h2>
+            <p class="muted">Owner page does not include PMC or owner-use cleaning fee. Add those here.</p>
+          </div>
+          <button class="secondary" id="signOutBtn" type="button">Sign out</button>
+        </div>
+
+        <form id="adminForm" class="form-grid hidden">
+          <input type="hidden" id="recordId" />
+
+          <section class="section full">
+            <h2>Owner submission</h2>
+          </section>
+
+          <label>
+            Owner
+            <input id="admin_owner_name" readonly />
+          </label>
+
+          <label>
+            Email
+            <input id="admin_owner_email" readonly />
+          </label>
+
+          <label class="full">
+            Property
+            <input id="admin_property_address" readonly />
+          </label>
+
+          <label>
+            City
+            <input id="admin_property_city" readonly />
+          </label>
+
+          <label>
+            State
+            <input id="admin_property_state" readonly />
+          </label>
+
+          <label>
+            ZIP
+            <input id="admin_property_zip" readonly />
+          </label>
+
+          <label>
+            Effective date
+            <input id="admin_effective_date" readonly />
+          </label>
+
+          <section class="section full">
+            <h2>Company-only fields</h2>
+          </section>
+
+          <label>
+            PMC %
+            <input id="pmc_percent" type="number" min="0" step="0.01" required />
+          </label>
+
+          <label>
+            Cleaning fee for owner use
+            <input id="owner_cleaning_fee" required />
+          </label>
+
+          <label class="full">
+            Internal notes
+            <textarea id="internal_notes" rows="3" placeholder="Optional"></textarea>
+          </label>
+
+          <div class="actions full">
+            <button class="secondary" id="saveBtn" type="button">Save admin fields</button>
+            <button class="primary" id="downloadBtn" type="button">Download PDF</button>
+            <span id="adminStatus" class="status"></span>
+          </div>
+        </form>
+
+        <div class="section hidden" id="recordPreviewWrap">
+          <h2>Agreement preview</h2>
+          <div class="viewer large">
+            <iframe src="agreement-template.pdf#view=FitH" title="Agreement template preview"></iframe>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>
