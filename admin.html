@@ -25,7 +25,7 @@
         <div class="split">
           <div>
             <h2>#1 Send new agreement</h2>
-            <p class="muted">Add the client email and your company-only terms first, then generate a client link and email draft.</p>
+            <p class="muted">You only set the client email, PMC, cleaning fee, and services. The owner fills the rest.</p>
           </div>
         </div>
 
@@ -36,41 +36,6 @@
           </label>
 
           <label>
-            Owner full legal name
-            <input id="new_owner_name" />
-          </label>
-
-          <label>
-            Phone
-            <input id="new_owner_phone" />
-          </label>
-
-          <label class="full">
-            Property address
-            <input id="new_property_address" />
-          </label>
-
-          <label>
-            City
-            <input id="new_property_city" />
-          </label>
-
-          <label>
-            State
-            <input id="new_property_state" value="SC" />
-          </label>
-
-          <label>
-            ZIP
-            <input id="new_property_zip" />
-          </label>
-
-          <label>
-            Effective date
-            <input id="new_effective_date" type="date" />
-          </label>
-
-          <label>
             PMC %
             <input id="new_pmc_percent" type="number" min="0" step="0.01" required />
           </label>
@@ -78,6 +43,35 @@
           <label>
             Cleaning fee for owner use
             <input id="new_owner_cleaning_fee" required />
+          </label>
+
+          <label class="check full">
+            <input type="checkbox" id="new_service_pool" />
+            <span>
+              <strong>Pool cleaning</strong>
+              <small>April to October: $250/month. November to April: $150/month.</small>
+            </span>
+          </label>
+
+          <label class="check full">
+            <input type="checkbox" id="new_service_pest" />
+            <span>
+              <strong>Pest control per unit</strong>
+              <small>$45 per month.</small>
+            </span>
+          </label>
+
+          <label class="check full">
+            <input type="checkbox" id="new_service_landscaping" />
+            <span>
+              <strong>Basic landscaping</strong>
+              <small>April to October: $90 to $130/month. November to April: $45 to $65/month.</small>
+            </span>
+          </label>
+
+          <label class="full">
+            Services notes
+            <textarea id="new_services_notes" rows="3"></textarea>
           </label>
 
           <div class="actions full">
@@ -111,7 +105,7 @@
           <div class="split">
             <div>
               <h2>Agreement details</h2>
-              <p class="muted">Load a record, review the owner data, edit if needed, sign as Ocean Vacations, then download the PDF.</p>
+              <p class="muted">Owner fills the personal information. You only review, adjust your company fields, sign, and download.</p>
             </div>
           </div>
 
@@ -211,7 +205,7 @@
             </label>
 
             <section class="section full">
-              <h2>Conditional services</h2>
+              <h2>Services arranged by Ocean Vacations</h2>
             </section>
 
             <label class="check full">
