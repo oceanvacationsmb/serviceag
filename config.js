@@ -1,6 +1,6 @@
 window.OV_CONFIG = {
-  supabaseUrl: 'PASTE_YOUR_SUPABASE_URL_HERE',
-  supabaseAnonKey: 'PASTE_YOUR_SUPABASE_ANON_KEY_HERE',
+  supabaseUrl: 'https://mevslbwcmxflofqyyeek.supabase.co',
+  supabaseAnonKey: 'sb_publishable_N-QXQGjsJZgN_hVGnV_FEA_KIWEBPPg',
   requesterNameAddress: 'OCEAN VACATIONS INC.'
 };
 
