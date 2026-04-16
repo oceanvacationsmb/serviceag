@@ -1,85 +1,257 @@
 const adminClient = getSupabaseClient();
 
-const loginCard = document.getElementById('loginCard');
-const adminApp = document.getElementById('adminApp');
-const loginForm = document.getElementById('loginForm');
-const loginStatus = document.getElementById('loginStatus');
+const newAgreementForm = document.getElementById('newAgreementForm');
+const newAgreementStatus = document.getElementById('newAgreementStatus');
+const clientLinkDisplay = document.getElementById('clientLinkDisplay');
+const copyClientLinkBtn = document.getElementById('copyClientLinkBtn');
+const emailClientBtn = document.getElementById('emailClientBtn');
+
 const recordsList = document.getElementById('recordsList');
+const refreshBtn = document.getElementById('refreshBtn');
 const adminForm = document.getElementById('adminForm');
 const adminStatus = document.getElementById('adminStatus');
-const refreshBtn = document.getElementById('refreshBtn');
-const signOutBtn = document.getElementById('signOutBtn');
 const saveBtn = document.getElementById('saveBtn');
-const downloadBtn = document.getElementById('downloadBtn');
 const previewBtn = document.getElementById('previewBtn');
-const previewWrap = document.getElementById('recordPreviewWrap');
+const expandPreviewBtn = document.getElementById('expandPreviewBtn');
+const deleteBtn = document.getElementById('deleteBtn');
+const signDownloadBtn = document.getElementById('signDownloadBtn');
+const recordPreviewWrap = document.getElementById('recordPreviewWrap');
 const pdfPreviewFrame = document.getElementById('pdfPreviewFrame');
+const pdfPreviewFrameLarge = document.getElementById('pdfPreviewFrameLarge');
+const previewModal = document.getElementById('previewModal');
+const closeModalBtn = document.getElementById('closeModalBtn');
+const modalBackdrop = document.getElementById('modalBackdrop');
+
+const adminSignatureCanvas = document.getElementById('adminSignaturePad');
+const adminSignatureCtx = adminSignatureCanvas.getContext('2d');
 
 let selectedRecord = null;
 let currentPreviewUrl = null;
+let latestClientLink = '';
 
-async function ensureSession() {
-  const { data } = await adminClient.auth.getSession();
-  if (data.session) {
-    showAdmin();
-    await loadRecords();
+function ownerFormLinkForToken(token) {
+  return `${window.OV_CONFIG.ownerPageBaseUrl}?token=${encodeURIComponent(token)}`;
+}
+
+function resizeCanvas(canvas, ctx) {
+  const ratio = Math.max(window.devicePixelRatio || 1, 1);
+  const rect = canvas.getBoundingClientRect();
+  const displayWidth = Math.max(300, Math.floor(rect.width || 700));
+  const displayHeight = 190;
+  canvas.width = Math.floor(displayWidth * ratio);
+  canvas.height = Math.floor(displayHeight * ratio);
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#111827';
+  ctx.lineWidth = 2.2;
+}
+
+function setupPad(canvas, ctx, clearBtnId) {
+  resizeCanvas(canvas, ctx);
+  let drawing = false;
+  let lastX = 0;
+  let lastY = 0;
+
+  function getPos(e) {
+    const r = canvas.getBoundingClientRect();
+    const point = e.touches ? e.touches[0] : e;
+    return { x: point.clientX - r.left, y: point.clientY - r.top };
   }
+
+  function start(e) {
+    e.preventDefault();
+    const p = getPos(e);
+    drawing = true;
+    lastX = p.x;
+    lastY = p.y;
+  }
+
+  function move(e) {
+    if (!drawing) return;
+    e.preventDefault();
+    const p = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    lastX = p.x;
+    lastY = p.y;
+  }
+
+  function end(e) {
+    if (e) e.preventDefault();
+    drawing = false;
+  }
+
+  canvas.addEventListener('mousedown', start);
+  canvas.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', end);
+  canvas.addEventListener('touchstart', start, { passive: false });
+  canvas.addEventListener('touchmove', move, { passive: false });
+  window.addEventListener('touchend', end, { passive: false });
+
+  document.getElementById(clearBtnId).addEventListener('click', () => {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  });
 }
 
-function showAdmin() {
-  loginCard.classList.add('hidden');
-  adminApp.classList.remove('hidden');
+function clearPreview() {
+  if (currentPreviewUrl) URL.revokeObjectURL(currentPreviewUrl);
+  currentPreviewUrl = null;
+  pdfPreviewFrame.src = '';
+  pdfPreviewFrameLarge.src = '';
 }
 
-function showLogin() {
-  adminApp.classList.add('hidden');
-  loginCard.classList.remove('hidden');
+function openModal() {
+  previewModal.classList.remove('hidden');
 }
 
-loginForm.addEventListener('submit', async (e) => {
+function closeModal() {
+  previewModal.classList.add('hidden');
+}
+
+closeModalBtn.addEventListener('click', closeModal);
+modalBackdrop.addEventListener('click', closeModal);
+
+function setValue(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.value = value || '';
+}
+
+function calculateAchStartDate(value) {
+  if (!value) return '';
+  const d = new Date(value + 'T12:00:00');
+  if (Number.isNaN(d.getTime())) return '';
+  const nextMonth = new Date(d.getFullYear(), d.getMonth() + 1, 5);
+  return `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-${String(nextMonth.getDate()).padStart(2, '0')}`;
+}
+
+function escapeHtml(str) {
+  return (str || '').replace(/[&<>"']/g, s => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  })[s]);
+}
+
+refreshBtn.addEventListener('click', loadRecords);
+
+newAgreementForm.addEventListener('submit', async (e) => {
   e.preventDefault();
-  loginStatus.textContent = 'Signing in...';
+  newAgreementStatus.textContent = 'Creating...';
 
-  const email = document.getElementById('loginEmail').value;
-  const password = document.getElementById('loginPassword').value;
+  const token = (window.crypto?.randomUUID?.() || `ov-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`);
+  const clientEmail = document.getElementById('new_client_email').value.trim();
+  const ownerName = document.getElementById('new_owner_name').value.trim();
+  const ownerPhone = document.getElementById('new_owner_phone').value.trim();
+  const propertyAddress = document.getElementById('new_property_address').value.trim();
+  const propertyCity = document.getElementById('new_property_city').value.trim();
+  const propertyState = document.getElementById('new_property_state').value.trim() || 'SC';
+  const propertyZip = document.getElementById('new_property_zip').value.trim();
+  const effectiveDate = document.getElementById('new_effective_date').value;
+  const pmcPercent = document.getElementById('new_pmc_percent').value;
+  const ownerCleaningFee = document.getElementById('new_owner_cleaning_fee').value;
 
-  const { error } = await adminClient.auth.signInWithPassword({ email, password });
+  const ownerPayload = {
+    client_email: clientEmail,
+    owner_name: ownerName,
+    owner_email: clientEmail,
+    owner_phone: ownerPhone,
+    property_address: propertyAddress,
+    property_city: propertyCity,
+    property_state: propertyState,
+    property_zip: propertyZip,
+    effective_date: effectiveDate,
+    bank_name: '',
+    routing_number: '',
+    account_number: '',
+    ach_amount: 'Suggested amount is $5000-$10000',
+    ach_frequency: 'MONTHLY',
+    ach_start_date: calculateAchStartDate(effectiveDate),
+    conditional_services: { pool: false, pest: false, landscaping: false, notes: '' },
+    owner_agreement_signature_data_url: '',
+    w9: {
+      name: '',
+      business_name: '',
+      classification: '',
+      tax_id_type: '',
+      tax_id: '',
+      exemptions: '',
+      address: '',
+      city: '',
+      state: 'SC',
+      zip: '',
+      signature_date: '',
+      signature_data_url: ''
+    },
+    requester_name_address: window.OV_CONFIG.requesterNameAddress
+  };
+
+  const adminPayload = {
+    pmc_percent: pmcPercent,
+    owner_cleaning_fee: ownerCleaningFee,
+    internal_notes: '',
+    admin_signature_data_url: ''
+  };
+
+  const { error } = await adminClient.from('agreements').insert({
+    agreement_token: token,
+    client_email: clientEmail,
+    owner_name: ownerName,
+    owner_email: clientEmail,
+    property_address: propertyAddress,
+    property_city: propertyCity,
+    property_state: propertyState,
+    property_zip: propertyZip,
+    status: 'pending_client',
+    owner_payload: ownerPayload,
+    admin_payload: adminPayload
+  });
+
   if (error) {
-    loginStatus.textContent = error.message;
+    newAgreementStatus.textContent = error.message;
     return;
   }
 
-  loginStatus.textContent = '';
-  showAdmin();
+  latestClientLink = ownerFormLinkForToken(token);
+  clientLinkDisplay.value = latestClientLink;
+  newAgreementStatus.textContent = 'Agreement created.';
   await loadRecords();
 });
 
-signOutBtn.addEventListener('click', async () => {
-  await adminClient.auth.signOut();
-  clearPreview();
-  showLogin();
+copyClientLinkBtn.addEventListener('click', async () => {
+  const value = clientLinkDisplay.value || latestClientLink;
+  if (!value) {
+    newAgreementStatus.textContent = 'Create an agreement first.';
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(value);
+    newAgreementStatus.textContent = 'Client link copied.';
+  } catch {
+    newAgreementStatus.textContent = value;
+  }
 });
 
-refreshBtn.addEventListener('click', loadRecords);
-saveBtn.addEventListener('click', saveAdminFields);
-downloadBtn.addEventListener('click', downloadPdf);
-previewBtn.addEventListener('click', previewPdf);
-
-function clearPreview() {
-  if (currentPreviewUrl) {
-    URL.revokeObjectURL(currentPreviewUrl);
-    currentPreviewUrl = null;
+emailClientBtn.addEventListener('click', () => {
+  const value = clientLinkDisplay.value || latestClientLink;
+  if (!value) {
+    newAgreementStatus.textContent = 'Create an agreement first.';
+    return;
   }
-  if (pdfPreviewFrame) pdfPreviewFrame.src = '';
-}
+  const email = document.getElementById('new_client_email').value.trim();
+  window.location.href =
+    `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent('Ocean Vacations Service Agreement')}&body=${encodeURIComponent(`Please review and complete your service agreement using this secure link:\n\n${value}`)}`;
+});
 
 async function loadRecords() {
-  adminStatus.textContent = '';
   recordsList.innerHTML = 'Loading...';
 
   const { data, error } = await adminClient
     .from('agreements')
-    .select('id, owner_name, owner_email, property_address, property_city, property_state, property_zip, status, owner_payload, admin_payload, created_at')
+    .select('*')
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -88,7 +260,7 @@ async function loadRecords() {
   }
 
   if (!data.length) {
-    recordsList.textContent = 'No saved agreements yet.';
+    recordsList.textContent = 'No agreements yet.';
     return;
   }
 
@@ -99,37 +271,13 @@ async function loadRecords() {
     btn.className = 'record-item';
     btn.innerHTML = `
       <strong>${escapeHtml(row.owner_name || 'Unnamed owner')}</strong>
+      <small>${escapeHtml(row.client_email || '')}</small>
       <small>${escapeHtml(row.property_address || '')}</small>
-      <small>${escapeHtml([row.property_city, row.property_state, row.property_zip].filter(Boolean).join(', '))}</small>
-      <small>Status: ${escapeHtml(row.status || 'submitted')}</small>
+      <small>Status: ${escapeHtml(row.status || '')}</small>
     `;
     btn.addEventListener('click', () => selectRecord(row, btn));
     recordsList.appendChild(btn);
   });
-}
-
-function formatClassification(value) {
-  const map = {
-    individual: 'Individual / sole proprietor',
-    c_corp: 'C corporation',
-    s_corp: 'S corporation',
-    partnership: 'Partnership',
-    trust_estate: 'Trust / estate',
-    llc_c: 'LLC taxed as C corporation',
-    llc_s: 'LLC taxed as S corporation',
-    llc_p: 'LLC taxed as Partnership',
-    other: 'Other'
-  };
-  return map[value] || value || '';
-}
-
-function serviceSummaryText(services) {
-  const lines = [];
-  if (services?.pool) lines.push('Pool Cleaning');
-  if (services?.pest) lines.push('Pest Control per unit');
-  if (services?.landscaping) lines.push('Basic Landscaping');
-  if (services?.notes) lines.push(`Notes: ${services.notes}`);
-  return lines.join(', ');
 }
 
 function selectRecord(row, btnEl) {
@@ -141,89 +289,180 @@ function selectRecord(row, btnEl) {
   const a = row.admin_payload || {};
   const w9 = p.w9 || {};
 
-  document.getElementById('recordId').value = row.id;
+  setValue('recordId', row.id);
+  setValue('record_status', row.status || '');
+  setValue('admin_client_email', row.client_email || p.client_email || '');
+  setValue('admin_effective_date', p.effective_date || '');
+  setValue('admin_owner_name', p.owner_name || row.owner_name || '');
+  setValue('admin_owner_email', p.owner_email || row.owner_email || '');
+  setValue('admin_owner_phone', p.owner_phone || '');
+  setValue('admin_property_address', p.property_address || row.property_address || '');
+  setValue('admin_property_city', p.property_city || row.property_city || '');
+  setValue('admin_property_state', p.property_state || row.property_state || 'SC');
+  setValue('admin_property_zip', p.property_zip || row.property_zip || '');
 
-  document.getElementById('admin_owner_name').value = p.owner_name || row.owner_name || '';
-  document.getElementById('admin_owner_email').value = p.owner_email || row.owner_email || '';
-  document.getElementById('admin_owner_phone').value = p.owner_phone || '';
-  document.getElementById('admin_property_address').value = p.property_address || row.property_address || '';
-  document.getElementById('admin_property_city').value = p.property_city || row.property_city || '';
-  document.getElementById('admin_property_state').value = p.property_state || row.property_state || '';
-  document.getElementById('admin_property_zip').value = p.property_zip || row.property_zip || '';
-  document.getElementById('admin_effective_date').value = p.effective_date || '';
+  setValue('admin_bank_name', p.bank_name || '');
+  setValue('admin_routing_number', p.routing_number || '');
+  setValue('admin_account_number', p.account_number || '');
+  setValue('admin_ach_amount', p.ach_amount || '');
+  setValue('admin_ach_frequency', p.ach_frequency || 'MONTHLY');
+  setValue('admin_ach_start_date', p.ach_start_date || '');
 
-  document.getElementById('admin_bank_name').value = p.bank_name || '';
-  document.getElementById('admin_routing_number').value = p.routing_number || '';
-  document.getElementById('admin_account_number').value = p.account_number || '';
-  document.getElementById('admin_ach_amount').value = p.ach_amount || '';
-  document.getElementById('admin_ach_frequency').value = p.ach_frequency || '';
-  document.getElementById('admin_ach_start_date').value = p.ach_start_date || '';
+  document.getElementById('admin_service_pool').checked = !!p.conditional_services?.pool;
+  document.getElementById('admin_service_pest').checked = !!p.conditional_services?.pest;
+  document.getElementById('admin_service_landscaping').checked = !!p.conditional_services?.landscaping;
+  setValue('admin_services_notes', p.conditional_services?.notes || '');
 
-  document.getElementById('admin_services').value = serviceSummaryText(p.conditional_services);
+  setValue('admin_w9_name', w9.name || '');
+  setValue('admin_w9_business_name', w9.business_name || '');
+  setValue('admin_w9_classification', w9.classification || '');
+  setValue('admin_w9_tax_id_type', w9.tax_id_type || '');
+  setValue('admin_w9_tax_id', w9.tax_id || '');
+  setValue('admin_w9_city', w9.city || '');
+  setValue('admin_w9_state', w9.state || '');
+  setValue('admin_w9_zip', w9.zip || '');
+  setValue('admin_w9_address', w9.address || '');
+  setValue('admin_w9_exemptions', w9.exemptions || '');
+  setValue('admin_w9_signature_date', w9.signature_date || '');
 
-  document.getElementById('admin_w9_name').value = w9.name || '';
-  document.getElementById('admin_w9_business_name').value = w9.business_name || '';
-  document.getElementById('admin_w9_classification').value = formatClassification(w9.classification);
-  document.getElementById('admin_w9_tax_id_type').value = w9.tax_id_type || '';
-  document.getElementById('admin_w9_tax_id').value = w9.tax_id || '';
-  document.getElementById('admin_w9_address').value = w9.address || '';
-  document.getElementById('admin_w9_city').value = w9.city || '';
-  document.getElementById('admin_w9_state').value = w9.state || '';
-  document.getElementById('admin_w9_zip').value = w9.zip || '';
-  document.getElementById('admin_w9_exemptions').value = w9.exemptions || '';
-  document.getElementById('admin_w9_signature_date').value = w9.signature_date || '';
+  setValue('pmc_percent', a.pmc_percent || '');
+  setValue('owner_cleaning_fee', a.owner_cleaning_fee || '');
+  setValue('internal_notes', a.internal_notes || '');
 
-  document.getElementById('pmc_percent').value = a.pmc_percent || '';
-  document.getElementById('owner_cleaning_fee').value = a.owner_cleaning_fee || '';
-  document.getElementById('internal_notes').value = a.internal_notes || '';
+  adminSignatureCtx.clearRect(0, 0, adminSignatureCanvas.width, adminSignatureCanvas.height);
 
   adminForm.classList.remove('hidden');
-  previewWrap.classList.remove('hidden');
+  recordPreviewWrap.classList.remove('hidden');
+
+  latestClientLink = ownerFormLinkForToken(row.agreement_token);
+  clientLinkDisplay.value = latestClientLink;
 
   previewPdf();
 }
 
-async function saveAdminFields() {
+function getAgreementPayloadFromForm() {
+  return {
+    client_email: document.getElementById('admin_client_email').value.trim(),
+    effective_date: document.getElementById('admin_effective_date').value,
+    owner_name: document.getElementById('admin_owner_name').value.trim(),
+    owner_email: document.getElementById('admin_owner_email').value.trim(),
+    owner_phone: document.getElementById('admin_owner_phone').value.trim(),
+    property_address: document.getElementById('admin_property_address').value.trim(),
+    property_city: document.getElementById('admin_property_city').value.trim(),
+    property_state: document.getElementById('admin_property_state').value.trim(),
+    property_zip: document.getElementById('admin_property_zip').value.trim(),
+    bank_name: document.getElementById('admin_bank_name').value.trim(),
+    routing_number: document.getElementById('admin_routing_number').value.trim(),
+    account_number: document.getElementById('admin_account_number').value.trim(),
+    ach_amount: document.getElementById('admin_ach_amount').value.trim(),
+    ach_frequency: document.getElementById('admin_ach_frequency').value.trim() || 'MONTHLY',
+    ach_start_date: document.getElementById('admin_ach_start_date').value,
+    conditional_services: {
+      pool: document.getElementById('admin_service_pool').checked,
+      pest: document.getElementById('admin_service_pest').checked,
+      landscaping: document.getElementById('admin_service_landscaping').checked,
+      notes: document.getElementById('admin_services_notes').value.trim()
+    },
+    owner_agreement_signature_data_url: selectedRecord?.owner_payload?.owner_agreement_signature_data_url || '',
+    w9: {
+      name: document.getElementById('admin_w9_name').value.trim(),
+      business_name: document.getElementById('admin_w9_business_name').value.trim(),
+      classification: document.getElementById('admin_w9_classification').value.trim(),
+      tax_id_type: document.getElementById('admin_w9_tax_id_type').value.trim(),
+      tax_id: document.getElementById('admin_w9_tax_id').value.trim(),
+      exemptions: document.getElementById('admin_w9_exemptions').value.trim(),
+      address: document.getElementById('admin_w9_address').value.trim(),
+      city: document.getElementById('admin_w9_city').value.trim(),
+      state: document.getElementById('admin_w9_state').value.trim(),
+      zip: document.getElementById('admin_w9_zip').value.trim(),
+      signature_date: document.getElementById('admin_w9_signature_date').value,
+      signature_data_url: selectedRecord?.owner_payload?.w9?.signature_data_url || ''
+    },
+    requester_name_address: window.OV_CONFIG.requesterNameAddress
+  };
+}
+
+function getAdminPayloadFromForm() {
+  return {
+    pmc_percent: document.getElementById('pmc_percent').value,
+    owner_cleaning_fee: document.getElementById('owner_cleaning_fee').value,
+    internal_notes: document.getElementById('internal_notes').value,
+    admin_signature_data_url: adminSignatureCanvas.toDataURL('image/png')
+  };
+}
+
+saveBtn.addEventListener('click', saveAgreement);
+previewBtn.addEventListener('click', previewPdf);
+expandPreviewBtn.addEventListener('click', () => {
+  if (currentPreviewUrl) openModal();
+});
+deleteBtn.addEventListener('click', deleteAgreement);
+signDownloadBtn.addEventListener('click', signAndDownloadPdf);
+
+async function saveAgreement() {
   if (!selectedRecord) {
-    adminStatus.textContent = 'Choose a saved agreement first.';
+    adminStatus.textContent = 'Choose an agreement first.';
     return;
   }
 
   adminStatus.textContent = 'Saving...';
 
-  const payload = {
-    pmc_percent: document.getElementById('pmc_percent').value,
-    owner_cleaning_fee: document.getElementById('owner_cleaning_fee').value,
-    internal_notes: document.getElementById('internal_notes').value
-  };
+  const ownerPayload = getAgreementPayloadFromForm();
+  if (!ownerPayload.ach_start_date && ownerPayload.effective_date) {
+    ownerPayload.ach_start_date = calculateAchStartDate(ownerPayload.effective_date);
+  }
 
-  const { error } = await adminClient
-    .from('agreements')
-    .update({
-      admin_payload: payload,
-      status: 'reviewed'
-    })
-    .eq('id', selectedRecord.id);
+  const adminPayload = getAdminPayloadFromForm();
+
+  const { error } = await adminClient.from('agreements').update({
+    client_email: ownerPayload.client_email,
+    owner_name: ownerPayload.owner_name,
+    owner_email: ownerPayload.owner_email,
+    property_address: ownerPayload.property_address,
+    property_city: ownerPayload.property_city,
+    property_state: ownerPayload.property_state,
+    property_zip: ownerPayload.property_zip,
+    owner_payload: ownerPayload,
+    admin_payload: adminPayload
+  }).eq('id', selectedRecord.id);
 
   if (error) {
     adminStatus.textContent = error.message;
     return;
   }
 
-  selectedRecord.admin_payload = payload;
-  selectedRecord.status = 'reviewed';
+  selectedRecord.owner_payload = ownerPayload;
+  selectedRecord.admin_payload = adminPayload;
+  selectedRecord.client_email = ownerPayload.client_email;
+  selectedRecord.owner_name = ownerPayload.owner_name;
+  selectedRecord.owner_email = ownerPayload.owner_email;
+
   adminStatus.textContent = 'Saved.';
   await loadRecords();
+  await previewPdf();
 }
 
-function escapeHtml(str) {
-  return (str || '').replace(/[&<>"']/g, s => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#039;'
-  })[s]);
+async function deleteAgreement() {
+  if (!selectedRecord) {
+    adminStatus.textContent = 'Choose an agreement first.';
+    return;
+  }
+
+  if (!window.confirm(`Delete agreement for ${selectedRecord.owner_name || 'this owner'}?`)) return;
+
+  const { error } = await adminClient.from('agreements').delete().eq('id', selectedRecord.id);
+
+  if (error) {
+    adminStatus.textContent = error.message;
+    return;
+  }
+
+  selectedRecord = null;
+  adminForm.classList.add('hidden');
+  recordPreviewWrap.classList.add('hidden');
+  clearPreview();
+  adminStatus.textContent = 'Agreement deleted.';
+  await loadRecords();
 }
 
 function normalizeDateForPdf(v) {
@@ -250,15 +489,6 @@ async function fetchTemplatePdf() {
   return res.arrayBuffer();
 }
 
-function serviceSummaryForPdf(services) {
-  const lines = [];
-  if (services?.pool) lines.push('Pool Cleaning');
-  if (services?.pest) lines.push('Pest Control per unit');
-  if (services?.landscaping) lines.push('Basic Landscaping');
-  if (services?.notes) lines.push(services.notes);
-  return lines.join('; ');
-}
-
 function drawText(page, text, x, y, options = {}) {
   const { font, size = 10 } = options;
   if (!text) return;
@@ -277,6 +507,15 @@ function drawFitText(page, text, x, y, maxWidth, options = {}) {
   }
 
   page.drawText(current, { x, y, size: fontSize, font });
+}
+
+function serviceSummaryForPdf(services) {
+  const lines = [];
+  if (services?.pool) lines.push('Pool Cleaning');
+  if (services?.pest) lines.push('Pest Control per unit');
+  if (services?.landscaping) lines.push('Basic Landscaping');
+  if (services?.notes) lines.push(services.notes);
+  return lines.join('; ');
 }
 
 async function drawW9(pdfDoc, page, data, font) {
@@ -317,46 +556,30 @@ async function drawW9(pdfDoc, page, data, font) {
   const taxType = w9.tax_id_type || '';
 
   if (taxType === 'SSN') {
-    const ssnBoxes = [406, 426, 446, 479, 499, 532, 552, 572, 592];
-    raw.slice(0, 9).split('').forEach((ch, i) => {
-      drawText(page, ch, ssnBoxes[i], 392, { font, size: 16 });
+    [406, 426, 446, 479, 499, 532, 552, 572, 592].forEach((x, i) => {
+      if (raw[i]) drawText(page, raw[i], x, 392, { font, size: 16 });
     });
   } else if (taxType === 'EIN') {
-    const einBoxes = [406, 439, 459, 479, 499, 519, 539, 559, 579];
-    raw.slice(0, 9).split('').forEach((ch, i) => {
-      drawText(page, ch, einBoxes[i], 356, { font, size: 16 });
+    [406, 439, 459, 479, 499, 519, 539, 559, 579].forEach((x, i) => {
+      if (raw[i]) drawText(page, raw[i], x, 356, { font, size: 16 });
     });
   }
 
   if (w9.signature_data_url && w9.signature_data_url.startsWith('data:image/png')) {
     const png = await pdfDoc.embedPng(w9.signature_data_url);
-    page.drawImage(png, {
-      x: 82,
-      y: 83,
-      width: 120,
-      height: 32
-    });
+    page.drawImage(png, { x: 82, y: 83, width: 120, height: 32 });
   }
 
   drawText(page, normalizeDateForPdf(w9.signature_date), 456, 86, { font, size: 10.5 });
 }
 
-function getAdminFields() {
-  return {
-    pmc_percent: document.getElementById('pmc_percent').value,
-    owner_cleaning_fee: document.getElementById('owner_cleaning_fee').value,
-    internal_notes: document.getElementById('internal_notes').value
-  };
-}
-
 async function buildPdfBytes() {
-  if (!selectedRecord) throw new Error('Choose a saved agreement first.');
+  if (!selectedRecord) throw new Error('Choose an agreement first.');
 
-  const p = selectedRecord.owner_payload || {};
-  const a = getAdminFields();
+  const p = getAgreementPayloadFromForm();
+  const a = getAdminPayloadFromForm();
 
-  const pdfBytes = await fetchTemplatePdf();
-  const pdfDoc = await PDFLib.PDFDocument.load(pdfBytes);
+  const pdfDoc = await PDFLib.PDFDocument.load(await fetchTemplatePdf());
   const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
   const pages = pdfDoc.getPages();
 
@@ -370,11 +593,20 @@ async function buildPdfBytes() {
   drawFitText(page4, a.owner_cleaning_fee || '', 425, 535, 120, { font, size: 11.5 });
   drawFitText(page4, serviceSummaryForPdf(p.conditional_services), 345, 440, 220, { font, size: 9.5 });
 
-  const sigParts = monthDayYearParts(p.effective_date);
-  drawFitText(page4, sigParts.day, 420, 292, 28, { font, size: 11 });
-  drawFitText(page4, sigParts.month, 468, 292, 65, { font, size: 11 });
-  drawFitText(page4, sigParts.year, 545, 292, 36, { font, size: 11 });
-  drawFitText(page4, p.owner_name, 118, 268, 160, { font, size: 11.5 });
+  const parts = monthDayYearParts(p.effective_date);
+  drawFitText(page4, parts.day, 420, 292, 28, { font, size: 11 });
+  drawFitText(page4, parts.month, 468, 292, 65, { font, size: 11 });
+  drawFitText(page4, parts.year, 545, 292, 36, { font, size: 11 });
+
+  if (p.owner_agreement_signature_data_url && p.owner_agreement_signature_data_url.startsWith('data:image/png')) {
+    const ownerPng = await pdfDoc.embedPng(p.owner_agreement_signature_data_url);
+    page4.drawImage(ownerPng, { x: 110, y: 252, width: 120, height: 32 });
+  }
+
+  if (a.admin_signature_data_url && a.admin_signature_data_url.startsWith('data:image/png')) {
+    const adminPng = await pdfDoc.embedPng(a.admin_signature_data_url);
+    page4.drawImage(adminPng, { x: 365, y: 252, width: 140, height: 32 });
+  }
 
   const page5 = pages[4];
   drawFitText(page5, p.owner_name, 103, 700, 210, { font, size: 12 });
@@ -387,53 +619,76 @@ async function buildPdfBytes() {
   drawFitText(page5, p.owner_name, 134, 434, 180, { font, size: 11.5 });
   drawFitText(page5, normalizeDateForPdf(p.effective_date), 136, 411, 140, { font, size: 11.5 });
 
-  const page6 = pages[5];
-  await drawW9(pdfDoc, page6, p, font);
+  await drawW9(pdfDoc, pages[5], p, font);
 
   return await pdfDoc.save();
 }
 
 async function previewPdf() {
   if (!selectedRecord) {
-    adminStatus.textContent = 'Choose a saved agreement first.';
+    adminStatus.textContent = 'Choose an agreement first.';
     return;
   }
 
   adminStatus.textContent = 'Building preview...';
 
   try {
-    const bytes = await buildPdfBytes();
-    const blob = new Blob([bytes], { type: 'application/pdf' });
-
+    const blob = new Blob([await buildPdfBytes()], { type: 'application/pdf' });
     clearPreview();
     currentPreviewUrl = URL.createObjectURL(blob);
     pdfPreviewFrame.src = currentPreviewUrl;
-    previewWrap.classList.remove('hidden');
-
+    pdfPreviewFrameLarge.src = currentPreviewUrl;
+    recordPreviewWrap.classList.remove('hidden');
     adminStatus.textContent = 'Preview loaded.';
   } catch (err) {
-    console.error(err);
     adminStatus.textContent = err.message || 'Could not build preview.';
   }
 }
 
-async function downloadPdf() {
+async function signAndDownloadPdf() {
   if (!selectedRecord) {
-    adminStatus.textContent = 'Choose a saved agreement first.';
+    adminStatus.textContent = 'Choose an agreement first.';
     return;
   }
 
-  const a = getAdminFields();
-  if (!a.pmc_percent || !a.owner_cleaning_fee) {
-    adminStatus.textContent = 'Add PMC and owner-use cleaning fee first.';
+  if (selectedRecord.status !== 'signed_by_owner' && selectedRecord.status !== 'completed') {
+    adminStatus.textContent = 'Wait until the client signs first.';
     return;
   }
 
-  adminStatus.textContent = 'Building PDF...';
+  const adminPayload = getAdminPayloadFromForm();
+  if (!adminPayload.admin_signature_data_url || adminPayload.admin_signature_data_url === 'data:,') {
+    adminStatus.textContent = 'Add your signature first.';
+    return;
+  }
+
+  const ownerPayload = getAgreementPayloadFromForm();
+
+  const update = await adminClient.from('agreements').update({
+    client_email: ownerPayload.client_email,
+    owner_name: ownerPayload.owner_name,
+    owner_email: ownerPayload.owner_email,
+    property_address: ownerPayload.property_address,
+    property_city: ownerPayload.property_city,
+    property_state: ownerPayload.property_state,
+    property_zip: ownerPayload.property_zip,
+    owner_payload: ownerPayload,
+    admin_payload: adminPayload,
+    status: 'completed',
+    signed_by_admin_at: new Date().toISOString()
+  }).eq('id', selectedRecord.id);
+
+  if (update.error) {
+    adminStatus.textContent = update.error.message;
+    return;
+  }
+
+  selectedRecord.status = 'completed';
+  selectedRecord.owner_payload = ownerPayload;
+  selectedRecord.admin_payload = adminPayload;
 
   try {
-    const bytes = await buildPdfBytes();
-    const blob = new Blob([bytes], { type: 'application/pdf' });
+    const blob = new Blob([await buildPdfBytes()], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
 
     const link = document.createElement('a');
@@ -444,21 +699,14 @@ async function downloadPdf() {
     link.remove();
     URL.revokeObjectURL(url);
 
-    await adminClient
-      .from('agreements')
-      .update({
-        admin_payload: a,
-        status: 'ready_for_signature'
-      })
-      .eq('id', selectedRecord.id);
-
-    selectedRecord.admin_payload = a;
-    adminStatus.textContent = 'Downloaded.';
+    await loadRecords();
     await previewPdf();
+    setValue('record_status', 'completed');
+    adminStatus.textContent = 'Signed and downloaded.';
   } catch (err) {
-    console.error(err);
-    adminStatus.textContent = err.message || 'Could not build the PDF.';
+    adminStatus.textContent = err.message || 'Could not build final PDF.';
   }
 }
 
-ensureSession();
+setupPad(adminSignatureCanvas, adminSignatureCtx, 'clearAdminSignature');
+loadRecords();
