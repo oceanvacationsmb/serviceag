@@ -7,15 +7,15 @@
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
-  <script src="config.js?v=5"></script>
-  <script src="admin.js?v=5" defer></script>
+  <script src="config.js?v=6"></script>
+  <script src="admin.js?v=6" defer></script>
 </head>
 <body>
   <div class="page">
     <header class="hero">
       <div>
         <h1>Ocean Vacations Service Agreement Verification</h1>
-        <p>Create a new agreement, review placement before sending, then send the owner link and track status.</p>
+        <p>Create a new agreement, review it, then send the owner link. After the owner completes it, load it, review it, sign it, and download the PDF.</p>
       </div>
       <span class="badge admin">Admin page</span>
     </header>
@@ -25,7 +25,7 @@
         <div class="split">
           <div>
             <h2>#1 Send new agreement</h2>
-            <p class="muted">You only set the client email, PMC, cleaning fee, and services. The owner fills the rest.</p>
+            <p class="muted">Admin only sets client email, PMC, cleaning fee, and services. Owner fills the rest from their link.</p>
           </div>
         </div>
 
@@ -106,7 +106,7 @@
           <div class="split">
             <div>
               <h2>Agreement details</h2>
-              <p class="muted">Load a record, review the owner data, adjust company fields, then review and sign the final PDF.</p>
+              <p class="muted">These fields appear after you load a saved agreement from the list.</p>
             </div>
           </div>
 
@@ -346,13 +346,11 @@
 
   <div id="reviewOverlay" class="review-overlay hidden">
     <div id="reviewBackdrop" class="review-backdrop"></div>
-
     <div class="review-popup">
       <div class="review-header">
         <h2>Review Agreement</h2>
         <button type="button" class="secondary" id="closeReviewBtn">Close</button>
       </div>
-
       <div class="review-body">
         <iframe id="pdfPreviewFrameLarge" title="Agreement review"></iframe>
       </div>
