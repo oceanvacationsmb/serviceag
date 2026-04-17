@@ -1,360 +1,61 @@
-<!doctype html>
+<!-- == Admin.html == -->
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Ocean Vacations Service Agreement Verification</title>
-  <link rel="stylesheet" href="styles.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
-  <script src="config.js"></script>
-  <script src="admin.js" defer></script>
+  <meta charset="UTF-8">
+  <title>Admin Agreements</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="Admin.js" defer></script>
 </head>
 <body>
   <div class="page">
-    <header class="hero">
+    <div class="hero">
       <div>
-        <h1>Ocean Vacations Service Agreement Verification</h1>
-        <p>Create a new agreement, review placement before sending, then send the owner link and track status.</p>
+        <h1>Admin Agreement Dashboard</h1>
+        <p>Manage, preview, and sign agreements for property owners. Enter required details, review the PDF, and email directly to the owner.</p>
       </div>
-      <span class="badge admin">Admin page</span>
-    </header>
-
-    <div id="adminApp">
-      <section class="card">
-        <div class="split">
-          <div>
-            <h2>#1 Send new agreement</h2>
-            <p class="muted">You only set the client email, PMC, cleaning fee, and services. The owner fills the rest.</p>
-          </div>
-        </div>
-
-        <form id="newAgreementForm" class="form-grid top-gap">
-          <label>
-            Client email
-            <input id="new_client_email" type="email" required />
-          </label>
-
-          <label>
-            PMC %
-            <input id="new_pmc_percent" type="number" min="0" step="0.01" required />
-          </label>
-
-          <label>
-            Cleaning fee for owner use
-            <input id="new_owner_cleaning_fee" required />
-          </label>
-
-          <label class="check full">
-            <input type="checkbox" id="new_service_pool" />
-            <span>
-              <strong>Pool cleaning</strong>
-              <small>April to October: $250/month. November to April: $150/month.</small>
-            </span>
-          </label>
-
-          <label class="check full">
-            <input type="checkbox" id="new_service_pest" />
-            <span>
-              <strong>Pest control per unit</strong>
-              <small>$45 per month.</small>
-            </span>
-          </label>
-
-          <label class="check full">
-            <input type="checkbox" id="new_service_landscaping" />
-            <span>
-              <strong>Basic landscaping</strong>
-              <small>April to October: $90 to $130/month. November to April: $45 to $65/month.</small>
-            </span>
-          </label>
-
-          <label class="full">
-            Services notes
-            <textarea id="new_services_notes" rows="3"></textarea>
-          </label>
-
-          <div class="actions full">
-            <button class="primary" id="createAgreementBtn" type="submit">Create agreement</button>
-            <button class="secondary" id="reviewNewAgreementBtn" type="button">Review agreement</button>
-            <button class="secondary" id="copyClientLinkBtn" type="button">Copy client link</button>
-            <button class="secondary" id="emailClientBtn" type="button">Open email draft</button>
-            <span id="newAgreementStatus" class="status"></span>
-          </div>
-
-          <label class="full">
-            Client link
-            <input id="clientLinkDisplay" readonly />
-          </label>
-        </form>
-      </section>
-
-      <div class="layout top-gap">
-        <aside class="card sidebar">
-          <div class="split">
-            <div>
-              <h2>#2 Agreements Status</h2>
-              <p class="muted small-text">pending_client = waiting for client, signed_by_owner = ready for your signature, completed = both signed</p>
-            </div>
-            <button class="secondary" id="refreshBtn" type="button">Refresh</button>
-          </div>
-
-          <div id="recordsList" class="records"></div>
-        </aside>
-
-        <main class="card">
-          <div class="split">
-            <div>
-              <h2>Agreement details</h2>
-              <p class="muted">Load a record, review the owner data, adjust company fields, then review and sign the final PDF.</p>
-            </div>
-          </div>
-
-          <form id="adminForm" class="form-grid hidden">
-            <input type="hidden" id="recordId" />
-
-            <section class="section full">
-              <h2>Agreement status</h2>
-            </section>
-
-            <label>
-              Status
-              <input id="record_status" readonly />
-            </label>
-
-            <label>
-              Client email
-              <input id="admin_client_email" />
-            </label>
-
-            <label>
-              Effective date
-              <input id="admin_effective_date" type="date" />
-            </label>
-
-            <section class="section full">
-              <h2>Owner information</h2>
-            </section>
-
-            <label>
-              Owner
-              <input id="admin_owner_name" />
-            </label>
-
-            <label>
-              Email
-              <input id="admin_owner_email" />
-            </label>
-
-            <label>
-              Phone
-              <input id="admin_owner_phone" />
-            </label>
-
-            <label class="full">
-              Property address
-              <input id="admin_property_address" />
-            </label>
-
-            <label>
-              Property city
-              <input id="admin_property_city" />
-            </label>
-
-            <label>
-              Property state
-              <input id="admin_property_state" />
-            </label>
-
-            <label>
-              Property ZIP
-              <input id="admin_property_zip" />
-            </label>
-
-            <section class="section full">
-              <h2>ACH / Direct debit</h2>
-            </section>
-
-            <label>
-              Financial institution
-              <input id="admin_bank_name" />
-            </label>
-
-            <label>
-              Routing number
-              <input id="admin_routing_number" />
-            </label>
-
-            <label>
-              Account number
-              <input id="admin_account_number" />
-            </label>
-
-            <label>
-              Amount / how amount is determined
-              <input id="admin_ach_amount" />
-            </label>
-
-            <label>
-              Frequency
-              <input id="admin_ach_frequency" />
-            </label>
-
-            <label>
-              ACH starting date
-              <input id="admin_ach_start_date" type="date" />
-            </label>
-
-            <section class="section full">
-              <h2>Services arranged by Ocean Vacations</h2>
-            </section>
-
-            <label class="check full">
-              <input type="checkbox" id="admin_service_pool" />
-              <span>
-                <strong>Pool cleaning</strong>
-                <small>April to October: $250/month. November to April: $150/month.</small>
-              </span>
-            </label>
-
-            <label class="check full">
-              <input type="checkbox" id="admin_service_pest" />
-              <span>
-                <strong>Pest control per unit</strong>
-                <small>$45 per month.</small>
-              </span>
-            </label>
-
-            <label class="check full">
-              <input type="checkbox" id="admin_service_landscaping" />
-              <span>
-                <strong>Basic landscaping</strong>
-                <small>April to October: $90 to $130/month. November to April: $45 to $65/month.</small>
-              </span>
-            </label>
-
-            <label class="full">
-              Services notes
-              <textarea id="admin_services_notes" rows="3"></textarea>
-            </label>
-
-            <section class="section full">
-              <h2>W-9 information</h2>
-            </section>
-
-            <label>
-              W-9 name
-              <input id="admin_w9_name" />
-            </label>
-
-            <label>
-              Business name
-              <input id="admin_w9_business_name" />
-            </label>
-
-            <label>
-              Classification
-              <input id="admin_w9_classification" />
-            </label>
-
-            <label>
-              Tax ID type
-              <input id="admin_w9_tax_id_type" />
-            </label>
-
-            <label>
-              Tax ID
-              <input id="admin_w9_tax_id" />
-            </label>
-
-            <label>
-              W-9 city
-              <input id="admin_w9_city" />
-            </label>
-
-            <label>
-              W-9 state
-              <input id="admin_w9_state" />
-            </label>
-
-            <label>
-              W-9 ZIP
-              <input id="admin_w9_zip" />
-            </label>
-
-            <label class="full">
-              W-9 address
-              <input id="admin_w9_address" />
-            </label>
-
-            <label>
-              W-9 exemptions
-              <input id="admin_w9_exemptions" />
-            </label>
-
-            <label>
-              W-9 signature date
-              <input id="admin_w9_signature_date" type="date" />
-            </label>
-
-            <section class="section full">
-              <h2>Company-only fields</h2>
-            </section>
-
-            <label>
-              PMC %
-              <input id="pmc_percent" type="number" min="0" step="0.01" required />
-            </label>
-
-            <label>
-              Cleaning fee for owner use
-              <input id="owner_cleaning_fee" required />
-            </label>
-
-            <label class="full">
-              Internal notes
-              <textarea id="internal_notes" rows="3"></textarea>
-            </label>
-
-            <section class="section full">
-              <h2>Ocean Vacations signature</h2>
-              <p class="muted">Sign after the client has signed.</p>
-            </section>
-
-            <div class="full">
-              <label>Admin signature</label>
-              <div class="sig-wrap">
-                <canvas id="adminSignaturePad"></canvas>
-              </div>
-              <div class="sig-actions">
-                <button type="button" class="secondary" id="clearAdminSignature">Clear signature</button>
-              </div>
-            </div>
-
-            <div class="actions full">
-              <button class="secondary" id="saveBtn" type="button">Save / Edit agreement</button>
-              <button class="secondary" id="reviewLoadedAgreementBtn" type="button">Review agreement</button>
-              <button class="danger" id="deleteBtn" type="button">Delete agreement</button>
-              <button class="primary" id="signDownloadBtn" type="button">Sign & Download PDF</button>
-              <span id="adminStatus" class="status"></span>
-            </div>
-          </form>
-        </main>
-      </div>
+      <span class="badge admin">Admin</span>
     </div>
-  </div>
 
-  <div class="modal hidden" id="previewModal">
-    <div class="modal-backdrop" id="modalBackdrop"></div>
-    <div class="modal-dialog">
-      <div class="modal-header">
-        <h2>Review Agreement</h2>
-        <button class="secondary" id="closeModalBtn" type="button">Close</button>
+    <!-- New Agreement Form -->
+    <form id="newAgreementForm" class="card form-grid full">
+      <label>Email (Owner)<input id="new_client_email" type="email" required></label>
+      <label>PMC Percent<input id="new_pmc_percent" type="number" required></label>
+      <label>Owner Cleaning Fee<input id="new_owner_cleaning_fee" type="number" required></label>
+      <!-- Add more fields as needed -->
+      <button class="primary" type="submit">Create Agreement</button>
+      <span id="newAgreementStatus" class="status"></span>
+    </form>
+    <button id="reviewNewAgreementBtn" class="primary">Preview PDF</button>
+    <input id="clientLinkDisplay" readonly placeholder="Client Link">
+    <button id="copyClientLinkBtn" class="secondary">Copy Link</button>
+    <button id="emailClientBtn" class="secondary">Email Owner</button>
+    
+    <!-- Modal for PDF Preview -->
+    <div id="previewModal" class="modal hidden">
+      <div class="modal-content viewer large">
+        <iframe id="pdfPreviewFrameLarge"></iframe>
+        <button id="closeModalBtn" class="secondary">Close</button>
       </div>
-      <div class="modal-body">
-        <iframe id="pdfPreviewFrameLarge" title="Agreement review"></iframe>
-      </div>
+      <div id="modalBackdrop" class="modal-backdrop"></div>
     </div>
-  </div>
-</body>
-</html>
+
+    <!-- Agreements List and Management -->
+    <div class="layout">
+      <aside>
+        <button id="refreshBtn" class="secondary">Refresh</button>
+        <div class="records" id="recordsList"></div>
+      </aside>
+      <section>
+        <form id="adminForm" class="card form-grid hidden">
+          <!-- Repeat all input fields for edit as in JS -->
+          <!-- ... -->
+          <canvas id="adminSignaturePad"></canvas>
+          <button id="saveBtn" class="primary">Save</button>
+          <button id="reviewLoadedAgreementBtn" class="secondary">Review</button>
+          <button id="deleteBtn" class="danger">Delete</button>
+          <button id="signDownloadBtn" class="primary">Sign & Download</button>
+          <span id="adminStatus" class="status"></span>
+        </form
+
