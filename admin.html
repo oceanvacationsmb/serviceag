@@ -15,7 +15,7 @@
     <header class="hero">
       <div>
         <h1>Ocean Vacations Service Agreement Verification</h1>
-        <p>Create a new agreement, send the client a secure link, track status, review signatures, and download the final PDF.</p>
+        <p>Create a new agreement, review placement before sending, then send the owner link and track status.</p>
       </div>
       <span class="badge admin">Admin page</span>
     </header>
@@ -76,6 +76,7 @@
 
           <div class="actions full">
             <button class="primary" id="createAgreementBtn" type="submit">Create agreement</button>
+            <button class="secondary" id="reviewNewAgreementBtn" type="button">Review agreement</button>
             <button class="secondary" id="copyClientLinkBtn" type="button">Copy client link</button>
             <button class="secondary" id="emailClientBtn" type="button">Open email draft</button>
             <span id="newAgreementStatus" class="status"></span>
@@ -105,7 +106,7 @@
           <div class="split">
             <div>
               <h2>Agreement details</h2>
-              <p class="muted">Owner fills the personal information. You only review, adjust your company fields, sign, and download.</p>
+              <p class="muted">Load a record, review the owner data, adjust company fields, then review and sign the final PDF.</p>
             </div>
           </div>
 
@@ -332,20 +333,12 @@
 
             <div class="actions full">
               <button class="secondary" id="saveBtn" type="button">Save / Edit agreement</button>
-              <button class="secondary" id="previewBtn" type="button">Preview PDF</button>
-              <button class="secondary" id="expandPreviewBtn" type="button">Expand preview</button>
+              <button class="secondary" id="reviewLoadedAgreementBtn" type="button">Review agreement</button>
               <button class="danger" id="deleteBtn" type="button">Delete agreement</button>
               <button class="primary" id="signDownloadBtn" type="button">Sign & Download PDF</button>
               <span id="adminStatus" class="status"></span>
             </div>
           </form>
-
-          <div class="section hidden" id="recordPreviewWrap">
-            <h2>Agreement preview</h2>
-            <div class="viewer compact">
-              <iframe id="pdfPreviewFrame" title="Agreement preview"></iframe>
-            </div>
-          </div>
         </main>
       </div>
     </div>
@@ -355,11 +348,11 @@
     <div class="modal-backdrop" id="modalBackdrop"></div>
     <div class="modal-dialog">
       <div class="modal-header">
-        <h2>Agreement Preview</h2>
+        <h2>Review Agreement</h2>
         <button class="secondary" id="closeModalBtn" type="button">Close</button>
       </div>
       <div class="modal-body">
-        <iframe id="pdfPreviewFrameLarge" title="Expanded agreement preview"></iframe>
+        <iframe id="pdfPreviewFrameLarge" title="Agreement review"></iframe>
       </div>
     </div>
   </div>
