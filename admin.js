@@ -5,18 +5,17 @@ const newAgreementStatus = document.getElementById('newAgreementStatus');
 const clientLinkDisplay = document.getElementById('clientLinkDisplay');
 const copyClientLinkBtn = document.getElementById('copyClientLinkBtn');
 const emailClientBtn = document.getElementById('emailClientBtn');
+const reviewNewAgreementBtn = document.getElementById('reviewNewAgreementBtn');
 
 const recordsList = document.getElementById('recordsList');
 const refreshBtn = document.getElementById('refreshBtn');
 const adminForm = document.getElementById('adminForm');
 const adminStatus = document.getElementById('adminStatus');
 const saveBtn = document.getElementById('saveBtn');
-const previewBtn = document.getElementById('previewBtn');
-const expandPreviewBtn = document.getElementById('expandPreviewBtn');
+const reviewLoadedAgreementBtn = document.getElementById('reviewLoadedAgreementBtn');
 const deleteBtn = document.getElementById('deleteBtn');
 const signDownloadBtn = document.getElementById('signDownloadBtn');
-const recordPreviewWrap = document.getElementById('recordPreviewWrap');
-const pdfPreviewFrame = document.getElementById('pdfPreviewFrame');
+
 const pdfPreviewFrameLarge = document.getElementById('pdfPreviewFrameLarge');
 const previewModal = document.getElementById('previewModal');
 const closeModalBtn = document.getElementById('closeModalBtn');
@@ -28,6 +27,7 @@ const adminSignatureCtx = adminSignatureCanvas.getContext('2d');
 let selectedRecord = null;
 let currentPreviewUrl = null;
 let latestClientLink = '';
+let lastCreatedDraft = null;
 
 function ownerFormLinkForToken(token) {
   return `${window.OV_CONFIG.ownerPageBaseUrl}?token=${encodeURIComponent(token)}`;
@@ -48,6 +48,7 @@ function resizeCanvas(canvas, ctx) {
 
 function setupPad(canvas, ctx, clearBtnId) {
   resizeCanvas(canvas, ctx);
+
   let drawing = false;
   let lastX = 0;
   let lastY = 0;
@@ -98,7 +99,6 @@ function setupPad(canvas, ctx, clearBtnId) {
 function clearPreview() {
   if (currentPreviewUrl) URL.revokeObjectURL(currentPreviewUrl);
   currentPreviewUrl = null;
-  pdfPreviewFrame.src = '';
   pdfPreviewFrameLarge.src = '';
 }
 
@@ -218,6 +218,7 @@ newAgreementForm.addEventListener('submit', async (e) => {
     return;
   }
 
+  lastCreatedDraft = { owner_payload: ownerPayload, admin_payload: adminPayload };
   latestClientLink = ownerFormLinkForToken(token);
   clientLinkDisplay.value = latestClientLink;
   newAgreementStatus.textContent = 'Agreement created.';
@@ -247,6 +248,67 @@ emailClientBtn.addEventListener('click', () => {
   const email = document.getElementById('new_client_email').value.trim();
   window.location.href =
     `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent('Ocean Vacations Service Agreement')}&body=${encodeURIComponent(`Please review and complete your service agreement using this secure link:\n\n${value}`)}`;
+});
+
+reviewNewAgreementBtn.addEventListener('click', async () => {
+  const clientEmail = document.getElementById('new_client_email').value.trim();
+  const pmcPercent = document.getElementById('new_pmc_percent').value;
+  const ownerCleaningFee = document.getElementById('new_owner_cleaning_fee').value;
+
+  if (!clientEmail || !pmcPercent || !ownerCleaningFee) {
+    newAgreementStatus.textContent = 'Fill client email, PMC %, and cleaning fee first.';
+    return;
+  }
+
+  const draft = {
+    owner_payload: {
+      client_email: clientEmail,
+      owner_name: '',
+      owner_email: clientEmail,
+      owner_phone: '',
+      property_address: '',
+      property_city: '',
+      property_state: 'SC',
+      property_zip: '',
+      effective_date: '',
+      bank_name: '',
+      routing_number: '',
+      account_number: '',
+      ach_amount: 'Suggested amount is $5000-$10000',
+      ach_frequency: 'MONTHLY',
+      ach_start_date: '',
+      conditional_services: {
+        pool: document.getElementById('new_service_pool').checked,
+        pest: document.getElementById('new_service_pest').checked,
+        landscaping: document.getElementById('new_service_landscaping').checked,
+        notes: document.getElementById('new_services_notes').value.trim()
+      },
+      owner_agreement_signature_data_url: '',
+      w9: {
+        name: '',
+        business_name: '',
+        classification: '',
+        tax_id_type: '',
+        tax_id: '',
+        exemptions: '',
+        address: '',
+        city: '',
+        state: 'SC',
+        zip: '',
+        signature_date: '',
+        signature_data_url: ''
+      },
+      requester_name_address: window.OV_CONFIG.requesterNameAddress
+    },
+    admin_payload: {
+      pmc_percent: pmcPercent,
+      owner_cleaning_fee: ownerCleaningFee,
+      internal_notes: '',
+      admin_signature_data_url: ''
+    }
+  };
+
+  await reviewAgreementData(draft.owner_payload, draft.admin_payload, 'new');
 });
 
 async function loadRecords() {
@@ -335,12 +397,9 @@ function selectRecord(row, btnEl) {
   adminSignatureCtx.clearRect(0, 0, adminSignatureCanvas.width, adminSignatureCanvas.height);
 
   adminForm.classList.remove('hidden');
-  recordPreviewWrap.classList.remove('hidden');
 
   latestClientLink = ownerFormLinkForToken(row.agreement_token);
   clientLinkDisplay.value = latestClientLink;
-
-  previewPdf();
 }
 
 function getAgreementPayloadFromForm() {
@@ -395,9 +454,12 @@ function getAdminPayloadFromForm() {
 }
 
 saveBtn.addEventListener('click', saveAgreement);
-previewBtn.addEventListener('click', previewPdf);
-expandPreviewBtn.addEventListener('click', () => {
-  if (currentPreviewUrl) openModal();
+reviewLoadedAgreementBtn.addEventListener('click', async () => {
+  if (!selectedRecord) {
+    adminStatus.textContent = 'Choose an agreement first.';
+    return;
+  }
+  await reviewAgreementData(getAgreementPayloadFromForm(), getAdminPayloadFromForm(), 'loaded');
 });
 deleteBtn.addEventListener('click', deleteAgreement);
 signDownloadBtn.addEventListener('click', signAndDownloadPdf);
@@ -442,7 +504,6 @@ async function saveAgreement() {
 
   adminStatus.textContent = 'Saved.';
   await loadRecords();
-  await previewPdf();
 }
 
 async function deleteAgreement() {
@@ -462,7 +523,6 @@ async function deleteAgreement() {
 
   selectedRecord = null;
   adminForm.classList.add('hidden');
-  recordPreviewWrap.classList.add('hidden');
   clearPreview();
   adminStatus.textContent = 'Agreement deleted.';
   await loadRecords();
@@ -576,11 +636,9 @@ async function drawW9(pdfDoc, page, data, font) {
   drawText(page, normalizeDateForPdf(w9.signature_date), 456, 86, { font, size: 10.5 });
 }
 
-async function buildPdfBytes() {
-  if (!selectedRecord) throw new Error('Choose an agreement first.');
-
-  const p = getAgreementPayloadFromForm();
-  const a = getAdminPayloadFromForm();
+async function buildPdfBytes(ownerPayload, adminPayload) {
+  const p = ownerPayload;
+  const a = adminPayload;
 
   const pdfDoc = await PDFLib.PDFDocument.load(await fetchTemplatePdf());
   const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
@@ -627,24 +685,29 @@ async function buildPdfBytes() {
   return await pdfDoc.save();
 }
 
-async function previewPdf() {
-  if (!selectedRecord) {
-    adminStatus.textContent = 'Choose an agreement first.';
-    return;
-  }
-
-  adminStatus.textContent = 'Building preview...';
-
+async function reviewAgreementData(ownerPayload, adminPayload, target) {
   try {
-    const blob = new Blob([await buildPdfBytes()], { type: 'application/pdf' });
+    if (!ownerPayload.ach_start_date && ownerPayload.effective_date) {
+      ownerPayload.ach_start_date = calculateAchStartDate(ownerPayload.effective_date);
+    }
+
+    const blob = new Blob([await buildPdfBytes(ownerPayload, adminPayload)], { type: 'application/pdf' });
     clearPreview();
     currentPreviewUrl = URL.createObjectURL(blob);
-    pdfPreviewFrame.src = currentPreviewUrl;
     pdfPreviewFrameLarge.src = currentPreviewUrl;
-    recordPreviewWrap.classList.remove('hidden');
-    adminStatus.textContent = 'Preview loaded.';
+    openModal();
+
+    if (target === 'new') {
+      newAgreementStatus.textContent = 'Review loaded.';
+    } else {
+      adminStatus.textContent = 'Review loaded.';
+    }
   } catch (err) {
-    adminStatus.textContent = err.message || 'Could not build preview.';
+    if (target === 'new') {
+      newAgreementStatus.textContent = err.message || 'Could not load review.';
+    } else {
+      adminStatus.textContent = err.message || 'Could not load review.';
+    }
   }
 }
 
@@ -691,7 +754,7 @@ async function signAndDownloadPdf() {
   selectedRecord.admin_payload = adminPayload;
 
   try {
-    const blob = new Blob([await buildPdfBytes()], { type: 'application/pdf' });
+    const blob = new Blob([await buildPdfBytes(ownerPayload, adminPayload)], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
 
     const link = document.createElement('a');
@@ -703,7 +766,6 @@ async function signAndDownloadPdf() {
     URL.revokeObjectURL(url);
 
     await loadRecords();
-    await previewPdf();
     setValue('record_status', 'completed');
     adminStatus.textContent = 'Signed and downloaded.';
   } catch (err) {
