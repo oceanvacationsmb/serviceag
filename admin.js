@@ -520,6 +520,7 @@ async function deleteAgreement() {
   selectedRecord = null;
   adminForm.classList.add('hidden');
   clearPreview();
+  closeReviewPopup();
   adminStatus.textContent = 'Agreement deleted.';
   await loadRecords();
 }
